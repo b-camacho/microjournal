@@ -16,3 +16,4 @@ cmd/boilerplate/boilerplate
 .idea
 vendor/*
 !vendor/vendor.json
+tmp.go
