@@ -41,3 +41,8 @@ func NewRouter() http.Handler {
 
 	return router
 }
+
+func GenericError(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte("Baaaaad request"))
+}

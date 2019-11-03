@@ -1,15 +1,24 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"strings"
-
+	"github.com/b-camacho/microjournal/internal/auth"
+	"github.com/b-camacho/microjournal/internal/db"
+	"github.com/b-camacho/microjournal/internal/server"
+	"github.com/gorilla/securecookie"
 	"log"
+	"net/http"
 
 	"github.com/go-chi/chi"
 )
+
+type Env struct {
+	store *db.PStore
+	auth *auth.Env
+	s *securecookie.SecureCookie
+}
 
 // ValidBearer is a hardcoded bearer token for demonstration purposes.
 const ValidBearer = "123456"
@@ -51,35 +60,41 @@ func HelloName(w http.ResponseWriter, r *http.Request) {
 // RequireAuthentication is an example middleware handler that checks for a
 // hardcoded bearer token. This can be used to verify session cookies, JWTs
 // and more.
-func RequireAuthentication(next http.Handler) http.Handler {
+func (env *Env) RequireAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Make sure an Authorization header was provided
-		token := r.Header.Get("Authorization")
-		if token == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		cookie, err := r.Cookie(auth.CookieName)
+		if err != nil {
+			server.GenericError(w, r)
 			return
 		}
-		token = strings.TrimPrefix(token, "Bearer ")
-		// This is where token validation would be done. For this boilerplate,
-		// we just check and make sure the token matches a hardcoded string
-		if token != ValidBearer {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		uid := 0
+		err = env.s.Decode(auth.CookieName, cookie.Value, &uid)
+		if err != nil {
+			server.GenericError(w, r)
 			return
 		}
-		// Assuming that passed, we can execute the authenticated handler
+		user, err := env.auth.DeserialiseUser(uid)
+		if err != nil {
+			server.GenericError(w, r)
+			return
+		}
+		r = r.WithContext(context.WithValue(r.Context(), "user", user))
+
 		next.ServeHTTP(w, r)
 	})
 }
 
 // NewRouter returns an HTTP handler that implements the routes for the API
-func NewRouter() http.Handler {
+func NewRouter(store *db.PStore, auth *auth.Env, s *securecookie.SecureCookie) http.Handler {
+	env := Env{store, auth, s}
+
 	r := chi.NewRouter()
 
-	r.Use(RequireAuthentication)
+	r.Use(env.RequireAuthentication)
 
 	// Register the API routes
 	r.Get("/", HelloWorld)
 	r.Get("/{name}", HelloName)
-
+	r.Post("/login", auth.HandleLogin())
 	return r
 }
