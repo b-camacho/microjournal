@@ -2,36 +2,38 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"time"
 
 	"github.com/b-camacho/microjournal/server"
 )
 
 type Config struct {
-	Urls []string
-	Env string
-	Port string
+	Url string `env:"URL"`
+	Environment string `env:"ENVIRONMENT"`
+	Port string `env:"PORT"`
+	DbUri string `env:"DBURI"`
 }
 
 func ReadConfig() Config{
-	configFile, err := os.Open("config.json")
-	if err != nil {
-		panic(err)
+	c := Config{}
+	valC := reflect.ValueOf(&c).Elem()
+	typeC := reflect.TypeOf(c)
+	for i:=0; i< typeC.NumField(); i+=1 {
+		configField := typeC.Field(i)
+		configVal := valC.Field(i)
+		envName := configField.Tag.Get("env")
+		if v, ok :=  os.LookupEnv(envName); !ok {
+			log.Fatalf("Required env var %s is not set", envName)
+		} else {
+			configVal.SetString(v)
+		}
 	}
-	defer configFile.Close()
-	bytes, _ := ioutil.ReadAll(configFile)
-	var config Config
-	err = json.Unmarshal(bytes, &config)
-	if err != nil {
-		panic(err)
-	}
-	return config
+	return c
 }
 
 func main() {
