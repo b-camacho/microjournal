@@ -25,6 +25,12 @@
 			"path": "github.com/lib/pq",
 			"revision": "f91d3411e481ed313eeab65ebfe9076466c39d01",
 			"revisionTime": "2019-10-11T15:32:32Z"
+		},
+		{
+			"checksumSHA1": "oCH3J96RWvO8W4xjix47PModpio=",
+			"path": "golang.org/x/crypto/bcrypt",
+			"revision": "8986dd9e96cf0a6f74da406c005ba3df38527c04",
+			"revisionTime": "2019-10-28T16:10:41Z"
 		}
 	],
 	"rootPath": "github.com/b-camacho/microjournal"
