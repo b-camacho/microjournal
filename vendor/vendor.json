@@ -9,6 +9,12 @@
 			"revisionTime": "2019-10-31T10:07:31Z"
 		},
 		{
+			"checksumSHA1": "VU3i5Dn5WnnAfFfGxq6NjAJIQOM=",
+			"path": "github.com/go-chi/chi/middleware",
+			"revision": "221acf29d02b708ec13791ff562888a730bfe6a7",
+			"revisionTime": "2019-10-31T10:07:31Z"
+		},
+		{
 			"checksumSHA1": "BDWFnC73539SruZwDebeWBK0j9g=",
 			"path": "github.com/jordan-wright/unindexed",
 			"revision": "78fa79113c0f7db2615bba6017c0580597f8a0a2",
