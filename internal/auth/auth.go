@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/b-camacho/microjournal/internal/db"
-	"github.com/b-camacho/microjournal/internal/server"
 	"github.com/b-camacho/microjournal/internal/server/middleware"
 	"github.com/gorilla/securecookie"
 	"golang.org/x/crypto/bcrypt"
@@ -16,7 +15,7 @@ const CookieName = "session"
 
 type Env struct {
 	store db.PStore
-	s securecookie.SecureCookie
+	s *securecookie.SecureCookie
 }
 
 func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
@@ -31,12 +30,20 @@ func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
 	return user, nil
 }
 
-func (env *Env) SerialiseUser(user db.User) int {
-	return user.Id
+func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
+	encoded, _ := env.s.Encode(CookieName, user.Id)
+	cookie := &http.Cookie{
+		Name:  CookieName,
+		Value: encoded,
+		Path:  "/",
+	}
+	return cookie
 }
 
-func (env *Env) DeserialiseUser(id int) (*db.User, error) {
-	return env.store.FindUser("id", id)
+func (env *Env) DeserialiseUser(cookie *http.Cookie) (*db.User, error) {
+	uid := 0
+	env.s.Decode(CookieName, cookie.Value, &uid)
+	return env.store.FindUser("id", uid)
 }
 
 
@@ -59,16 +66,11 @@ func (env *Env) HandleLogin() http.HandlerFunc {
 		body := r.Context().Value(middleware.CtxBody).(LoginPayload)
 		user, err := env.AuthenticateUser(body.Email, body.Password)
 		if err != nil {
-			server.GenericError(w, r)
+			http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 			return
 		}
-		id := env.SerialiseUser(*user)
-		encoded, _ := env.s.Encode(CookieName, id)
-		cookie := &http.Cookie{
-			Name:  CookieName,
-			Value: encoded,
-			Path:  "/",
-		}
+		cookie := env.SerialiseUser(user)
+
 		http.SetCookie(w, cookie)
 
 		w.Write([]byte("ok"))
@@ -77,6 +79,10 @@ func (env *Env) HandleLogin() http.HandlerFunc {
 	return middleware.ParseBody(http.HandlerFunc(fn), payload, LoginValidate).ServeHTTP
 }
 
+func Init(store db.PStore, hashKey, blockKey []byte) Env {
+	sc := securecookie.New(hashKey, blockKey)
+	return Env{store, sc}
+}
 
 
 

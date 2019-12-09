@@ -21,7 +21,3 @@ type Post = struct {
 	title string
 	body string
 }
-
-func (u *User) Authenticate() {
-
-}

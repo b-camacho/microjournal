@@ -2,13 +2,16 @@ package server
 
 import (
 	"fmt"
+	"github.com/b-camacho/microjournal/internal/auth"
+	"github.com/b-camacho/microjournal/internal/config"
+	"github.com/b-camacho/microjournal/internal/db"
+	"github.com/b-camacho/microjournal/internal/server/api"
 	"net/http"
 	"path/filepath"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/b-camacho/microjournal/internal/server/api"
 	"github.com/jordan-wright/unindexed"
 )
 
@@ -18,7 +21,7 @@ func HelloWorld(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewRouter returns a new HTTP handler that implements the main server routes
-func NewRouter() http.Handler {
+func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.Handler {
 	router := chi.NewRouter()
 
 	// Set up our middleware with sane defaults
@@ -32,7 +35,7 @@ func NewRouter() http.Handler {
 	router.Get("/", HelloWorld)
 
 	// Set up our API
-	router.Mount("/api/v1/", api.NewRouter())
+	router.Mount("/api/v1/", api.NewRouter(store, authProvider))
 
 	// Set up static file serving
 	staticPath, _ := filepath.Abs("../static/")

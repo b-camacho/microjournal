@@ -9,22 +9,22 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type DB struct {
-	conn *sql.DB
-}
-
 type PStore interface {
 	FindUser(string, interface{}) (*User, error)
 	CreateUser(string, []byte) (*User, error)
 }
 
-func Init(connStr string) DB {
+type DB struct {
+	conn *sql.DB
+}
+
+func Init(connStr string) PStore {
 	conn, err := sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	DB := DB{conn}
-	return DB
+	return &DB
 }
 
 func (db *DB) FindUser(colName string, colValue interface{}) (*User, error) {
