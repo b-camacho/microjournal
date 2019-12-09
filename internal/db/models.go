@@ -10,13 +10,13 @@ type Model struct {
 }
 
 type User = struct {
-	*Model
+	Model
 	Email    string
 	Password []byte
 }
 
 type Post = struct {
-	*Model
+	Model
 	UserId int
 	title string
 	body string
