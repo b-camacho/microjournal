@@ -6,6 +6,7 @@ import (
 	"github.com/b-camacho/microjournal/internal/config"
 	"github.com/b-camacho/microjournal/internal/db"
 	"github.com/b-camacho/microjournal/internal/server/api"
+	"github.com/b-camacho/microjournal/internal/server/render"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -31,16 +32,16 @@ func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.
 	router.Use(middleware.DefaultCompress)
 	router.Use(middleware.Timeout(60 * time.Second))
 
-	// Set up our root handlers
-	router.Get("/", HelloWorld)
+	// Set up rendered site handlers
+	router.Mount("/", render.NewRouter(store, authProvider))
 
-	// Set up our API
+	// Set up REST API
 	router.Mount("/api/v1/", api.NewRouter(store, authProvider))
 
 	// Set up static file serving
 	staticPath, _ := filepath.Abs("../static/")
 	fs := http.FileServer(unindexed.Dir(staticPath))
-	router.Handle("/*", fs)
+	router.Handle("/static/*", fs)
 
 	return router
 }

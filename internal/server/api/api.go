@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/b-camacho/microjournal/internal/auth"
@@ -29,42 +28,34 @@ func jsonResponse(w http.ResponseWriter, data interface{}, c int) {
 	fmt.Fprintf(w, "%s", dj)
 }
 
-func (env *Env) RequireAuthentication(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/login" || r.URL.Path == "/api/v1/register"{ // these are exempt from auth
-			next.ServeHTTP(w, r)
-			return
-		}
-		cookie, err := r.Cookie(auth.CookieName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-		user, err := env.auth.DeserialiseUser(cookie)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-		r = r.WithContext(context.WithValue(r.Context(), "user", user))
-		next.ServeHTTP(w, r)
-	})
-}
-
 // NewRouter returns an HTTP handler that implements the routes for the API
 func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 	env := Env{store, auth}
 
 	r := chi.NewRouter()
 
-	r.Use(env.RequireAuthentication)
-	r.Post("/login", auth.HandleLogin)
+	authMiddleware := env.auth.RequireAuthentication(
+		[]string{"/api/v1/login", "/api/v1/register"},
+		func(err error, w http.ResponseWriter) {http.Error(w, err.Error(), 401)},
+		)
+
+	r.Use(authMiddleware)
+	r.Post("/login", env.PostLogin)
 	r.Post("/register", env.PostRegister)
 
 	r.Get("/post", env.GetPosts)
 	r.Post("/post", env.CreatePost)
 
-
 	return r
+}
+
+func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
+	err := env.auth.HandleLogin(w, r)
+	if err != nil {
+		log.Printf("failed auth attempt: %s ", err.Error())
+		http.Error(w, "Authentication failed", http.StatusUnauthorized)
+	}
+	return
 }
 
 type RegisterPayload struct {

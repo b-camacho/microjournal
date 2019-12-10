@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,25 +66,46 @@ func LoginValidate(payload *LoginPayload) bool {
 	return true
 }
 
-func (env *Env) HandleLogin(w http.ResponseWriter, r *http.Request) {
+func (env *Env) HandleLogin(w http.ResponseWriter, r *http.Request) error{
 	payload := LoginPayload{}
 	decoder := json.NewDecoder(r.Body)
 	if decoder.Decode(&payload) != nil || !LoginValidate(&payload) {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return errors.New("invalid login request format")
 	}
 
 	user, err := env.AuthenticateUser(payload.Email, payload.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
+		return err
 	}
 	cookie := env.SerialiseUser(user)
 
 	http.SetCookie(w, cookie)
+	return nil
+}
 
-	w.Write([]byte("ok"))
-
+func (env *Env) RequireAuthentication(exclusions []string, onerr func(error, http.ResponseWriter)) func(handler http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			for _, excl := range exclusions { // these are exempt from auth
+				if r.URL.Path == excl {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			cookie, err := r.Cookie(CookieName)
+			if err != nil {
+				onerr(err, w)
+				return
+			}
+			user, err := env.DeserialiseUser(cookie)
+			if err != nil {
+				onerr(err, w)
+				return
+			}
+			r = r.WithContext(context.WithValue(r.Context(), "user", user))
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func Init(store db.PStore, blockKey, hashKey []byte) Env {
