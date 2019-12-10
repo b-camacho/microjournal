@@ -111,12 +111,12 @@ func (env *Env) CreatePost(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
 	if decoder.Decode(&payload) != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "json body could not be parsed", http.StatusBadRequest)
 		return
 	}
 	err := env.store.CreatePost(u.Id, payload.Body, payload.Title)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
