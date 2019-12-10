@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"github.com/b-camacho/microjournal/internal/auth"
 	"github.com/b-camacho/microjournal/internal/config"
 	"github.com/b-camacho/microjournal/internal/db"
@@ -19,7 +20,15 @@ func main() {
 	log.Println(conf)
 
 	store := db.Init(conf.DbUri)
-	authProvider := auth.Init(store, []byte("very secure"), []byte("much safety"))
+	blockKey, err := hex.DecodeString(conf.CookieBlockKey)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	hashKey, err := hex.DecodeString(conf.CookieHashKey)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	authProvider := auth.Init(store, blockKey, hashKey)
 	// This is the domain the server should accept connections for.
 	handler := server.NewRouter(conf, authProvider, store)
 	srv := &http.Server{
@@ -37,7 +46,6 @@ func main() {
 			panic(err)
 		}
 	}()
-
 
 	// Wait for an interrupt
 	c := make(chan os.Signal, 1)
