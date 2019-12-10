@@ -18,6 +18,6 @@ type User = struct {
 type Post = struct {
 	Model
 	UserId int
-	title string
-	body string
+	Title string
+	Body string
 }

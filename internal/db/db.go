@@ -13,6 +13,8 @@ import (
 type PStore interface {
 	FindUser(string, interface{}) (*User, error)
 	CreateUser(string, []byte) (*User, error)
+	FindPosts(int) []Post
+	CreatePost(int, string, string) error
 }
 
 type DB struct {
@@ -70,4 +72,34 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 		return nil, err
 	}
 	return db.FindUser("email", email)
+}
+
+func (db *DB) FindPosts(userId int) []Post {
+	postRows, err := db.conn.
+		Query(`SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS WHERE user_id = $1`, userId)
+	if err != nil {
+		log.Fatal(err.Error())
+		return []Post{}
+	}
+	posts := make([]Post, 0)
+	defer postRows.Close()
+
+	for postRows.Next() {
+		var post Post
+		var deleted_at sql.NullTime
+		err = postRows.Scan(&post.Id, &post.Title, &post.Body, &post.CreatedAt, &post.UpdatedAt, deleted_at)
+		if err == nil || !deleted_at.Valid {
+			posts = append(posts, post)
+		}
+		if err != nil {
+			log.Println(err.Error())
+		}
+	}
+	return posts
+}
+
+func (db *DB) CreatePost(userId int, title, body string) error {
+	_, err := db.conn.
+		Exec(`INSERT INTO posts VALUES (DEFAULT, $1, $2, $3)`, userId, title, body)
+	return err
 }
