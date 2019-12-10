@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 
@@ -23,19 +24,30 @@ func Init(connStr string) PStore {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = conn.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	DB := DB{conn}
 	return &DB
 }
 
 func (db *DB) FindUser(colName string, colValue interface{}) (*User, error) {
-	query := `SELECT id, email, password, created_at, updated_at, deleted_at
-			FROM users WHERE $1 = $2`
+	if colName != "id" && colName != "email" {
+		return nil, errors.New(fmt.Sprintf("not a valid columnd name: %s", colName))
+	}
+
+	query := fmt.Sprintf(`SELECT id, email, password, created_at, updated_at, deleted_at
+			FROM users WHERE %s = $1`, colName)
 
 	var u User
+	var deleted_at sql.NullTime
 	notFound := db.conn.
-		QueryRow(query, colName, colValue).
-		Scan(&u.Id, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt)
-	if notFound != nil {
+		QueryRow(query, colValue).
+		Scan(&u.Id, &u.Email, &u.Password, &u.CreatedAt, &u.UpdatedAt, &deleted_at)
+
+	if notFound != nil || deleted_at.Valid {
 		return nil, notFound
 	} else {
 		return &u, nil
