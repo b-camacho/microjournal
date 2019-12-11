@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/jordan-wright/unindexed"
 )
 
 // HelloWorld is a sample handler
@@ -32,16 +31,17 @@ func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.
 	router.Use(middleware.DefaultCompress)
 	router.Use(middleware.Timeout(60 * time.Second))
 
+	// Set up static file serving
+	staticPath, _ := filepath.Abs("internal/static")
+	fmt.Println(staticPath)
+	fs := http.FileServer(http.Dir(staticPath))
+	router.Handle("/static*", http.StripPrefix("/static/", fs))
+
 	// Set up rendered site handlers
 	router.Mount("/", render.NewRouter(store, authProvider))
 
 	// Set up REST API
 	router.Mount("/api/v1/", api.NewRouter(store, authProvider))
-
-	// Set up static file serving
-	staticPath, _ := filepath.Abs("../static/")
-	fs := http.FileServer(unindexed.Dir(staticPath))
-	router.Handle("/static/*", fs)
 
 	return router
 }
