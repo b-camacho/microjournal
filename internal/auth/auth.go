@@ -2,15 +2,12 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/b-camacho/microjournal/internal/db"
 	"github.com/gorilla/securecookie"
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
-	"strings"
 )
 
 const CookieName = "session"
@@ -23,11 +20,11 @@ type Env struct {
 func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
 	user, err := env.store.FindUser("email", email)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("No user with email %s", email))
+		return nil, fmt.Errorf("no user with email %s", email)
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Incorrect password"))
+		return nil, fmt.Errorf("incorrect password")
 	}
 	return user, nil
 }
@@ -52,35 +49,6 @@ func (env *Env) DeserialiseUser(cookie *http.Cookie) (*db.User, error) {
 		return nil, err
 	}
 	return env.store.FindUser("id", uid)
-}
-
-type LoginPayload struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func LoginValidate(payload *LoginPayload) bool {
-	if strings.Index(payload.Email, "@") == -1 {
-		return false // TODO: actual email regex match
-	}
-	return true
-}
-
-func (env *Env) HandleLogin(w http.ResponseWriter, r *http.Request) error{
-	payload := LoginPayload{}
-	decoder := json.NewDecoder(r.Body)
-	if decoder.Decode(&payload) != nil || !LoginValidate(&payload) {
-		return errors.New("invalid login request format")
-	}
-
-	user, err := env.AuthenticateUser(payload.Email, payload.Password)
-	if err != nil {
-		return err
-	}
-	cookie := env.SerialiseUser(user)
-
-	http.SetCookie(w, cookie)
-	return nil
 }
 
 func (env *Env) RequireAuthentication(exclusions []string, onerr func(error, http.ResponseWriter)) func(handler http.Handler) http.Handler {

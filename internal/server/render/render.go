@@ -23,8 +23,7 @@ type Env struct {
 type RenderParams struct {
 	flash string
 }
-
-func ReadTemplate(dir, name string) *template.Template {
+func parseTemplates(dir, name string) *template.Template {
 	f, err := os.Open(dir + "/components")
 	if err != nil {
 		panic(err)
@@ -50,7 +49,7 @@ func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templ
 
 // NewRouter returns an HTTP handler that implements the routes for the API
 func NewRouter(store db.PStore, auth auth.Env) http.Handler {
-	tmpl := ReadTemplate("internal/templates", "home.tmpl")
+	tmpl := parseTemplates("internal/templates", "home.tmpl")
 
 	env := Env{store, auth, tmpl}
 
@@ -96,14 +95,22 @@ func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
-	err := env.auth.HandleLogin(w, r)
+	err := r.ParseForm()
+	if err != nil {
+		env.template.ExecuteTemplate(w, "login", RenderParams{"log in failed"})
+	}
+	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
+	user, err := env.auth.AuthenticateUser(email, password)
 	if err != nil {
 		log.Printf("failed auth attempt: %s ", err.Error())
-
-		http.Redirect(w, r, "/login", 401)
+		w.WriteHeader(401)
+		env.template.ExecuteTemplate(w, "login", RenderParams{"incorrect username or password"})
+		return
 	}
+
+	cookie := env.auth.SerialiseUser(user)
+	http.SetCookie(w, cookie)
 	http.Redirect(w, r, "/entries", 200)
-	return
 }
 
 type RegisterPayload struct {

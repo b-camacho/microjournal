@@ -7,6 +7,7 @@ import (
 	"github.com/b-camacho/microjournal/internal/db"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi"
 )
@@ -49,13 +50,34 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 	return r
 }
 
-func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
-	err := env.auth.HandleLogin(w, r)
-	if err != nil {
-		log.Printf("failed auth attempt: %s ", err.Error())
-		http.Error(w, "Authentication failed", http.StatusUnauthorized)
+type LoginPayload struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func LoginValidate(payload *LoginPayload) bool {
+	if strings.Index(payload.Email, "@") == -1 {
+		return false // TODO: actual email regex match
 	}
-	return
+	return true
+}
+
+func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
+	payload := LoginPayload{}
+	decoder := json.NewDecoder(r.Body)
+	if decoder.Decode(&payload) != nil || !LoginValidate(&payload) {
+		http.Error(w, "invalid login request format", 400)
+		return
+	}
+
+	user, err := env.auth.AuthenticateUser(payload.Email, payload.Password)
+	if err != nil {
+		http.Error(w, err.Error(), 401)
+		return
+	}
+	cookie := env.auth.SerialiseUser(user)
+
+	http.SetCookie(w, cookie)
 }
 
 type RegisterPayload struct {
