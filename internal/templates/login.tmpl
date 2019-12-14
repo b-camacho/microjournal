@@ -6,9 +6,19 @@
     <body>
         {{template "navbar"}}
     <div class="container">
+        {{if .Flash}}
+            {{template "flash" .Flash}}
+        {{end}}
         <div class="row">
+            <div class="col-md about">
+                <h1>Simple journaling</h1>
+                <p> μjournal is a free, open source journaling app.
+                    It supports export to .csv and has a JSON API.
+                    It doesn't (and won't) use JavasScript, trackers, or show ads.
+                </p>
+            </div>
             <div class="col-md">
-                <h1 class="form-heading">Log in</h1>
+                <h1 class="form-heading">Sign in</h1>
                 <form action="/login" method="post" enctype="application/x-www-form-urlencoded">
                     <div class="form-group">
                         <input name="email" type="email" class="text-entry" placeholder="Email">
@@ -20,10 +30,16 @@
                 </form>
             </div>
             <div class="col-md">
-                {{/*col2*/}}
-            </div>
-            <div class="col-md">
-                {{/*col3*/}}
+                <h1 class="form-heading">Sign up</h1>
+                <form action="/register" method="post" enctype="application/x-www-form-urlencoded">
+                    <div class="form-group">
+                        <input name="email" type="email" class="text-entry" placeholder="Email">
+                    </div>
+                    <div class="form-group">
+                        <input name="password" type="password" class="text-entry" placeholder="Password">
+                    </div>
+                    <button type="submit" class="submit">Submit</button>
+                </form>
             </div>
             {{/*<div class="col-6"></div>*/}}
         </div>
