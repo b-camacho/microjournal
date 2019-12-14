@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"github.com/b-camacho/microjournal/internal/auth"
 	"github.com/b-camacho/microjournal/internal/config"
 	"github.com/b-camacho/microjournal/internal/db"
@@ -32,7 +33,7 @@ func main() {
 	// This is the domain the server should accept connections for.
 	handler := server.NewRouter(conf, authProvider, store)
 	srv := &http.Server{
-		Addr:         conf.Port,
+		Addr:         fmt.Sprintf(":%s", conf.Port),
 		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
