@@ -55,7 +55,7 @@ func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templ
 func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 	tmpl := parseTemplates("internal/templates", "home.tmpl")
 
-	env := Env{store, auth, tmpl, 100}
+	env := Env{store, auth, tmpl, 20}
 
 	r := chi.NewRouter()
 
@@ -171,7 +171,7 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 	}
 	data := EntriesResp{
 		Entries: entries,
-		DayIdx: len(entries),
+		DayIdx: postCnt,
 		Pages: pageNumbers,
 	}
 	env.renderResponse(w, "entries", data)

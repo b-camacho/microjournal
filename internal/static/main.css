@@ -142,3 +142,9 @@ header.navbar {
 a.disabled {
     pointer-events: none;
 }
+nav.nav {
+    width: 100%
+}
+nav.nav > a.right {
+    margin-left: auto;
+}
