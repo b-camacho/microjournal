@@ -170,6 +170,7 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 		pageNumbers[i] = Page{i + 1, i == pageNo}
 	}
 	data := EntriesResp{
+		RenderParams: RenderParams{true, ""},
 		Entries: entries,
 		DayIdx: postCnt,
 		Pages: pageNumbers,
@@ -193,12 +194,14 @@ func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 }
 
 func (env *Env) GetLogout(w http.ResponseWriter, r *http.Request) {
+	u := r.Context().Value("user").(*db.User)
 	cookie := &http.Cookie{
 		Name:  auth.CookieName,
 		Value: "",
 		Path:  "/",
 	}
 	http.SetCookie(w, cookie)
+	env.store.InvalidateSession(u.Id)
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
@@ -249,6 +252,7 @@ type Page struct {
 	Current bool
 }
 type EntriesResp struct {
+	RenderParams
 	Entries []Entry
 	DayIdx int
 	Pages []Page

@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS posts CASCADE;
-
+DROP TABLE IF EXISTS sessions CASCADE;
 CREATE TABLE users (
                      id serial PRIMARY KEY,
                      email       varchar not null CHECK (email <> ''),
@@ -19,4 +19,12 @@ CREATE TABLE posts (
                      created_at timestamp with time zone NOT NULL default now(),
                      updated_at timestamp with time zone NOT NULL default now(),
                      deleted_at timestamp with time zone default null
+);
+
+CREATE TABLE sessions (
+                      id serial PRIMARY KEY,
+                      user_id integer references users(id) unique,
+                      created_at timestamp with time zone NOT NULL default now(),
+                      updated_at timestamp with time zone NOT NULL default now(),
+                      valid boolean default true
 );

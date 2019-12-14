@@ -15,6 +15,9 @@ type PStore interface {
 	CreateUser(string, []byte) (*User, error)
 	FindPosts(int, int, int) ([]*Post, int)
 	CreatePost(int, string, string) error
+	CreateSession(int) error
+	ExistsSession(int) bool
+	InvalidateSession(int) error
 }
 
 type DB struct {
@@ -119,3 +122,29 @@ func (db *DB) CreatePost(userId int, title, body string) error {
 		Exec(`INSERT INTO posts VALUES (DEFAULT, $1, $2, $3)`, userId, title, body)
 	return err
 }
+
+func (db *DB) CreateSession(userId int) error {
+	_, err := db.conn.
+		Exec("INSERT INTO sessions VALUES " +
+			"(DEFAULT, $1, DEFAULT, DEFAULT, DEFAULT) " +
+			"ON CONFLICT (user_id) DO UPDATE SET updated_at = now(), valid = true", userId)
+	return err
+}
+
+func (db *DB) ExistsSession(userId int) bool {
+	var hasSession int
+
+	db.conn.
+		QueryRow("SELECT COUNT(1) FROM sessions WHERE user_id = $1 AND valid = TRUE", userId).Scan(&hasSession)
+	if hasSession == 1 {
+		return true
+	}
+	return false
+}
+
+func (db *DB) InvalidateSession(userId int) error {
+	_, err := db.conn.
+		Exec("UPDATE sessions SET valid = false WHERE user_id = $1", userId)
+	return err
+}
+

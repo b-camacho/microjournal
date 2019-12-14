@@ -4,7 +4,7 @@
     {{ template "header" }}
 
     <body>
-        {{template "navbar"}}
+        {{template "navbar" .}}
     <div class="container">
         {{if .Flash}}
             {{template "flash" .Flash}}
