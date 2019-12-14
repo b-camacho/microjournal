@@ -13,7 +13,7 @@ import (
 type PStore interface {
 	FindUser(string, interface{}) (*User, error)
 	CreateUser(string, []byte) (*User, error)
-	FindPosts(int) []Post
+	FindPosts(int, int, int) []Post
 	CreatePost(int, string, string) error
 }
 
@@ -57,7 +57,7 @@ func (db *DB) FindUser(colName string, colValue interface{}) (*User, error) {
 }
 
 func (db *DB) CreateUser(email string, password []byte) (*User, error) {
-	if _, missing := db.FindUser("email", email); missing != nil {
+	if _, missing := db.FindUser("email", email); missing == nil {
 		return nil, errors.New("This email address is taken")
 	}
 	hash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
@@ -65,8 +65,7 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 		return nil, err
 	}
 
-	statement := `INSERT INTO users(email, password)
-	VALUES($1, $2)`
+	statement := `INSERT INTO users(email, password) VALUES($1, $2)`
 	_, err = db.conn.Exec(statement, email, hash)
 	if err != nil {
 		return nil, err
@@ -74,9 +73,9 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 	return db.FindUser("email", email)
 }
 
-func (db *DB) FindPosts(userId int) []Post {
+func (db *DB) FindPosts(userId, offset, limit int) []Post {
 	postRows, err := db.conn.
-		Query(`SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS WHERE user_id = $1`, userId)
+		Query(`SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS WHERE user_id = $1 ORDER BY created_at DESC`, userId)
 	if err != nil {
 		log.Fatal(err.Error())
 		return []Post{}
@@ -87,7 +86,7 @@ func (db *DB) FindPosts(userId int) []Post {
 	for postRows.Next() {
 		var post Post
 		var deleted_at sql.NullTime
-		err = postRows.Scan(&post.Id, &post.Title, &post.Body, &post.CreatedAt, &post.UpdatedAt, deleted_at)
+		err = postRows.Scan(&post.Id, &post.Title, &post.Body, &post.CreatedAt, &post.UpdatedAt, &deleted_at)
 		if err == nil || !deleted_at.Valid {
 			posts = append(posts, post)
 		}

@@ -108,7 +108,7 @@ type PostsResponse struct {
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value("user").(*db.User)
 	response := PostsResponse{
-		Posts: env.store.FindPosts(u.Id),
+		Posts: env.store.FindPosts(u.Id, 0, 100),
 	}
 	jsonResponse(w, response, http.StatusOK)
 }

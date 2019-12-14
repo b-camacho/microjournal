@@ -1,7 +1,6 @@
 package render
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/b-camacho/microjournal/internal/auth"
 	"github.com/b-camacho/microjournal/internal/db"
@@ -11,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -18,11 +18,13 @@ type Env struct {
 	store    db.PStore
 	auth     auth.Env
 	template *template.Template
+	perPage int
 }
 
 type RenderParams struct {
-	flash string
+	Flash string
 }
+
 func parseTemplates(dir, name string) *template.Template {
 	f, err := os.Open(dir + "/components")
 	if err != nil {
@@ -40,6 +42,7 @@ func parseTemplates(dir, name string) *template.Template {
 	template.Must(tmpl.ParseGlob(dir + "/**/*.tmpl"))
 	return tmpl
 }
+
 func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templateData interface{}) {
 	err := env.template.ExecuteTemplate(w, templateName, templateData)
 	if err != nil {
@@ -51,25 +54,25 @@ func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templ
 func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 	tmpl := parseTemplates("internal/templates", "home.tmpl")
 
-	env := Env{store, auth, tmpl}
+	env := Env{store, auth, tmpl, 100}
 
 	r := chi.NewRouter()
 
-	//authMiddleware := env.auth.RequireAuthentication(
-	//	[]string{"/login", "/register", "/about", "/"},
-	//	func(err error, w http.ResponseWriter) {
-	//		w.WriteHeader(401)
-	//		err = tmpl.ExecuteTemplate(w, "login", RenderParams{"You need to log in before accessing that page"})
-	//		if err != nil {
-	//			log.Println(err.Error())
-	//		}
-	//	},
-	//)
-	//r.Use(authMiddleware)
+	authMiddleware := env.auth.RequireAuthentication(
+		[]string{"/login", "/register", "/about", "/"},
+		func(err error, w http.ResponseWriter) {
+			w.WriteHeader(401)
+			err = tmpl.ExecuteTemplate(w, "login", RenderParams{"You need to sign in before accessing that page"})
+			if err != nil {
+				log.Println(err.Error())
+			}
+		},
+	)
+	r.Use(authMiddleware)
 	r.Get("/", env.GetHome)
 	r.Get("/entries", env.GetEntries)
 	r.Get("/login", env.GetLogin)
-	r.Get("/register", env.GetRegister)
+	//r.Get("/register", env.GetRegister)
 	r.Post("/entry", env.PostEntry)
 	r.Post("/register", env.PostRegister)
 	r.Post("/login", env.PostLogin)
@@ -83,28 +86,28 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 }
 
 func (env *Env) GetHome(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "home", "")
+	env.renderResponse(w, "login", RenderParams{""})
 }
 
 func (env *Env) GetLogin(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", "")
+	env.renderResponse(w, "login", RenderParams{""})
 }
 
 func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "register", "")
+	env.renderResponse(w, "register", RenderParams{""})
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{"log in failed"})
+		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
 	user, err := env.auth.AuthenticateUser(email, password)
 	if err != nil {
 		log.Printf("failed auth attempt: %s ", err.Error())
 		w.WriteHeader(401)
-		env.template.ExecuteTemplate(w, "login", RenderParams{"incorrect username or password"})
+		env.template.ExecuteTemplate(w, "login", RenderParams{"The username or password are not correct."})
 		return
 	}
 
@@ -119,20 +122,59 @@ type RegisterPayload struct {
 }
 
 func (env *Env) PostRegister(w http.ResponseWriter, r *http.Request) {
-	var payload RegisterPayload
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
-	if decoder.Decode(&payload) != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	err := r.ParseForm()
+	if err != nil {
+		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
 		return
 	}
-	user, err := env.store.CreateUser(payload.Email, payload.Password)
+	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
+	user, err := env.store.CreateUser(email, []byte(password))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 	cookie := env.auth.SerialiseUser(user)
 	http.SetCookie(w, cookie)
-	http.Redirect(w, r, "/entries", 200)
+	http.Redirect(w, r, "/entries", http.StatusSeeOther)
+}
+
+func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
+	u := r.Context().Value("user").(*db.User)
+	pageNoStr := r.URL.Query().Get("page")
+	pageNo := 0
+	if pageNoStr != "" {
+		var err error
+		pageNo, err = strconv.Atoi(pageNoStr)
+		if err != nil {
+			env.renderResponse(w, "error", RenderParams{"An error has occured"})
+			return
+		}
+	}
+
+	posts := env.store.FindPosts(u.Id, pageNo * env.perPage, (pageNo + 1) * env.perPage)
+	entries := make([]Entry, 0)
+	for _, post := range posts {
+		entries = append(entries, toEntry(&post))
+	}
+	data := EntriesResp{
+		Entries: entries,
+		DayIdx: len(entries),
+	}
+	env.renderResponse(w, "entries", data)
+}
+
+func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
+	u := r.Context().Value("user").(*db.User)
+	err := r.ParseForm()
+	if err != nil {
+		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
+		return
+	}
+	err = env.store.CreatePost(u.Id, r.PostForm.Get("title"), r.PostForm.Get("body"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/entries", http.StatusSeeOther)
 }
 
 func niceDuration(elapsed time.Duration) string {
@@ -162,6 +204,7 @@ func niceElapsed(from time.Time) string {
 	elapsed := now.Sub(from)
 	return niceDuration(elapsed)
 }
+
 func toEntry(post *db.Post) Entry {
 	friendlyDate := niceElapsed(post.CreatedAt)
 	return Entry{
@@ -180,46 +223,4 @@ type Entry struct {
 type EntriesResp struct {
 	Entries []Entry
 	DayIdx int
-}
-
-func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
-	//u := r.Context().Value("user").(*db.User)
-	//data := PostsResponse{
-	//	Posts: env.store.FindPosts(u.Id),
-	//}
-	env.renderResponse(w, "entries", EntriesResp{[]Entry{
-		{
-			Created_at: "yesterday",
-			Title:  "Lorem Ipsum",
-			Body:   "Illo corrupti sint perferendis. Illum voluptatem nobis qui. Facilis exercitationem est sapiente nihil aut ipsum. Omnis est nisi dicta et nesciunt iusto.",
-		}, {
-			Created_at: "just now",
-			Title:  "Lorem Ipsum 2",
-			Body:   ` sunt sunt fugit eius sint numquam eos ad earum facilis quis enim non officia animi tempore quia enim fuga quos atque reiciendis dolor quia itaque voluptatem quas velit quo voluptas voluptatem soluta voluptate accusantium incidunt esse quo ut quibusdam quas tempora possimus perspiciatis omnis natus accusantium est quaerat ab eveniet `,
-		},
-	},
-	2})
-}
-
-type PostPayload struct {
-	Body  string `json:"body"`
-	Title string `json:"title"`
-}
-
-func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value("user").(*db.User)
-	var payload PostPayload
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
-	if decoder.Decode(&payload) != nil {
-		http.Error(w, "json body could not be parsed", http.StatusBadRequest)
-		return
-	}
-	err := env.store.CreatePost(u.Id, payload.Body, payload.Title)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	http.Redirect(w, r, "/entries", 200)
 }
