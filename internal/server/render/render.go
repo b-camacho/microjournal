@@ -216,7 +216,7 @@ func niceDuration(elapsed time.Duration) string {
 		if elapsed.Hours() < 2 {
 			return "an hour ago"
 		}
-		return fmt.Sprint("%d hours ago", elapsed.Hours())
+		return fmt.Sprintf("%d hours ago", int(math.Round(elapsed.Hours())))
 	}
 	if elapsed.Hours() / 24 < 2 {
 		return "yesterday"
