@@ -13,7 +13,7 @@ import (
 type PStore interface {
 	FindUser(string, interface{}) (*User, error)
 	CreateUser(string, []byte) (*User, error)
-	FindPosts(int, int, int) []Post
+	FindPosts(int, int, int) ([]*Post, int)
 	CreatePost(int, string, string) error
 }
 
@@ -73,14 +73,29 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 	return db.FindUser("email", email)
 }
 
-func (db *DB) FindPosts(userId, offset, limit int) []Post {
+func (db *DB) FindPosts(userId, offset, limit int) ([]*Post, int) {
+	query := fmt.Sprintf("SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS " +
+		"WHERE user_id = $1 AND deleted_at IS NULL " +
+		"ORDER BY created_at DESC " +
+		"LIMIT %d OFFSET %d", limit, offset)
+
 	postRows, err := db.conn.
-		Query(`SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS WHERE user_id = $1 ORDER BY created_at DESC`, userId)
+		Query(query, userId)
 	if err != nil {
 		log.Fatal(err.Error())
-		return []Post{}
+		return []*Post{}, 0
 	}
-	posts := make([]Post, 0)
+
+	var rowCnt int
+	err = db.conn.
+		QueryRow(`SELECT COUNT(1) FROM POSTS WHERE user_id = $1 AND deleted_at IS NULL`, userId).
+		Scan(&rowCnt)
+	if err != nil {
+		log.Fatal(err.Error())
+		return []*Post{}, 0
+	}
+
+	posts := make([]*Post, 0)
 	defer postRows.Close()
 
 	for postRows.Next() {
@@ -88,13 +103,15 @@ func (db *DB) FindPosts(userId, offset, limit int) []Post {
 		var deleted_at sql.NullTime
 		err = postRows.Scan(&post.Id, &post.Title, &post.Body, &post.CreatedAt, &post.UpdatedAt, &deleted_at)
 		if err == nil || !deleted_at.Valid {
-			posts = append(posts, post)
+			posts = append(posts, &post)
 		}
 		if err != nil {
 			log.Println(err.Error())
 		}
 	}
-	return posts
+
+
+	return posts, rowCnt
 }
 
 func (db *DB) CreatePost(userId int, title, body string) error {

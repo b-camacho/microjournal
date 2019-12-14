@@ -102,13 +102,15 @@ func (env *Env) PostRegister(w http.ResponseWriter,	r *http.Request) {
 }
 
 type PostsResponse struct {
-	Posts []db.Post
+	Posts []*db.Post
+	PostCnt int
 }
 
 func (env *Env) GetPosts(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value("user").(*db.User)
+	posts, postCnt := env.store.FindPosts(u.Id, 0, 100)
 	response := PostsResponse{
-		Posts: env.store.FindPosts(u.Id, 0, 100),
+		Posts: posts, PostCnt: postCnt,
 	}
 	jsonResponse(w, response, http.StatusOK)
 }

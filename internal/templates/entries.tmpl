@@ -6,7 +6,6 @@
     <body class="text-center">
     {{template "navbar"}}
     <div class="container">
-
         <div class="row">
             <div class="col-md-3"></div>
             <div class="col-md-6">
@@ -27,6 +26,14 @@
                         {{template "entry" .}}
                     {{end}}
                 </div>
+                {{/*{{if gt (len .Pages) 1}}*/}}
+                    <div class="pagination">
+                        {{range $idx, $el := .Pages}}
+                            <a href="/entries?page={{$idx}}" class="{{if $el.Current}} disabled{{end}}">{{$el.Idx}}</a>
+                        {{end}}
+                    </div>
+
+                {{/*{{end}}*/}}
             </div>
             <div class="col-md-3"></div>
         </div>

@@ -22,6 +22,7 @@ type Env struct {
 }
 
 type RenderParams struct {
+	LoggedIn bool
 	Flash string
 }
 
@@ -62,20 +63,24 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 		[]string{"/login", "/register", "/about", "/"},
 		func(err error, w http.ResponseWriter) {
 			w.WriteHeader(401)
-			err = tmpl.ExecuteTemplate(w, "login", RenderParams{"You need to sign in before accessing that page"})
+			err = tmpl.ExecuteTemplate(w, "login", RenderParams{Flash: "You need to sign in before accessing that page"})
 			if err != nil {
 				log.Println(err.Error())
 			}
 		},
 	)
+
 	r.Use(authMiddleware)
 	r.Get("/", env.GetHome)
-	r.Get("/entries", env.GetEntries)
+	r.Get("/register", env.GetRegister)
 	r.Get("/login", env.GetLogin)
+	r.Get("/entries", env.GetEntries)
 	//r.Get("/register", env.GetRegister)
 	r.Post("/entry", env.PostEntry)
 	r.Post("/register", env.PostRegister)
 	r.Post("/login", env.PostLogin)
+
+	r.Get("/logout", env.GetLogout)
 	//r.Post("/login", env.PostLogin)
 	//r.Post("/register", env.PostRegister)
 	//
@@ -86,34 +91,34 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 }
 
 func (env *Env) GetHome(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{""})
+	env.renderResponse(w, "login", RenderParams{false, ""})
 }
 
 func (env *Env) GetLogin(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{""})
+	env.renderResponse(w, "login", RenderParams{false, ""})
 }
 
 func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "register", RenderParams{""})
+	env.renderResponse(w, "register", RenderParams{false, ""})
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
+		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"Sign in failed, please try again."})
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
 	user, err := env.auth.AuthenticateUser(email, password)
 	if err != nil {
 		log.Printf("failed auth attempt: %s ", err.Error())
 		w.WriteHeader(401)
-		env.template.ExecuteTemplate(w, "login", RenderParams{"The username or password are not correct."})
+		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"The username or password are not correct."})
 		return
 	}
 
 	cookie := env.auth.SerialiseUser(user)
 	http.SetCookie(w, cookie)
-	http.Redirect(w, r, "/entries", 200)
+	http.Redirect(w, r, "/entries", http.StatusSeeOther)
 }
 
 type RegisterPayload struct {
@@ -124,7 +129,7 @@ type RegisterPayload struct {
 func (env *Env) PostRegister(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
+		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"Sign in failed, please try again."})
 		return
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
@@ -145,19 +150,29 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 		var err error
 		pageNo, err = strconv.Atoi(pageNoStr)
 		if err != nil {
-			env.renderResponse(w, "error", RenderParams{"An error has occured"})
+			env.renderResponse(w, "error", RenderParams{true, "An error has occured"})
 			return
 		}
 	}
 
-	posts := env.store.FindPosts(u.Id, pageNo * env.perPage, (pageNo + 1) * env.perPage)
+	posts, postCnt := env.store.FindPosts(u.Id, pageNo * env.perPage, (pageNo + 1) * env.perPage)
 	entries := make([]Entry, 0)
 	for _, post := range posts {
-		entries = append(entries, toEntry(&post))
+		entries = append(entries, toEntry(post))
+	}
+
+	pageCnt := postCnt / env.perPage
+	if postCnt % env.perPage != 0 {
+		pageCnt += 1
+	}
+	pageNumbers := make([]Page, pageCnt)
+	for i := range pageNumbers {
+		pageNumbers[i] = Page{i + 1, i == pageNo}
 	}
 	data := EntriesResp{
 		Entries: entries,
 		DayIdx: len(entries),
+		Pages: pageNumbers,
 	}
 	env.renderResponse(w, "entries", data)
 }
@@ -166,7 +181,7 @@ func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value("user").(*db.User)
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{"Sign in failed, please try again."})
+		env.template.ExecuteTemplate(w, "login", RenderParams{true,"Could not create post"})
 		return
 	}
 	err = env.store.CreatePost(u.Id, r.PostForm.Get("title"), r.PostForm.Get("body"))
@@ -175,6 +190,16 @@ func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/entries", http.StatusSeeOther)
+}
+
+func (env *Env) GetLogout(w http.ResponseWriter, r *http.Request) {
+	cookie := &http.Cookie{
+		Name:  auth.CookieName,
+		Value: "",
+		Path:  "/",
+	}
+	http.SetCookie(w, cookie)
+	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
 func niceDuration(elapsed time.Duration) string {
@@ -219,8 +244,12 @@ type Entry struct {
 	Title string
 	Body string
 }
-
+type Page struct {
+	Idx int
+	Current bool
+}
 type EntriesResp struct {
 	Entries []Entry
 	DayIdx int
+	Pages []Page
 }
