@@ -62,19 +62,27 @@ func (env *Env) DeserialiseUser(cookie *http.Cookie) (*db.User, error) {
 func (env *Env) RequireAuthentication(exclusions []string, onerr func(error, http.ResponseWriter)) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var excluded bool
 			for _, excl := range exclusions { // these are exempt from auth
 				if r.URL.Path == excl {
-					next.ServeHTTP(w, r)
-					return
+					excluded = true
 				}
 			}
 			cookie, err := r.Cookie(CookieName)
 			if err != nil {
+				if excluded {
+					next.ServeHTTP(w, r)
+					return
+				}
 				onerr(err, w)
 				return
 			}
 			user, err := env.DeserialiseUser(cookie)
 			if err != nil {
+				if excluded {
+					next.ServeHTTP(w, r)
+					return
+				}
 				onerr(err, w)
 				return
 			}

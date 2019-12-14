@@ -51,6 +51,10 @@ func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templ
 	}
 }
 
+func loggedIn(r *http.Request) bool {
+	return r.Context().Value("user") != nil
+}
+
 // NewRouter returns an HTTP handler that implements the routes for the API
 func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 	tmpl := parseTemplates("internal/templates", "home.tmpl")
@@ -91,15 +95,15 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 }
 
 func (env *Env) GetHome(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{false, ""})
+	env.renderResponse(w, "login", RenderParams{loggedIn(r), ""})
 }
 
 func (env *Env) GetLogin(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{false, ""})
+	env.renderResponse(w, "login", RenderParams{loggedIn(r), ""})
 }
 
 func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "register", RenderParams{false, ""})
+	env.renderResponse(w, "register", RenderParams{loggedIn(r), ""})
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
