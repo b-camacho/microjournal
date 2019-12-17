@@ -1,6 +1,7 @@
 package render
 
 import (
+	"context"
 	"fmt"
 	"github.com/b-camacho/microjournal/internal/auth"
 	"github.com/b-camacho/microjournal/internal/db"
@@ -11,8 +12,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
+
+const FlashCtx = "error_flash"
 
 type Env struct {
 	store    db.PStore
@@ -21,9 +25,17 @@ type Env struct {
 	perPage int
 }
 
-type RenderParams struct {
+type BaseParams struct {
 	LoggedIn bool
 	Flash string
+}
+
+func (bp *BaseParams) SetFlash(flash string) {
+	bp.Flash = flash
+}
+
+type RenderParams interface {
+	SetFlash(flash string)
 }
 
 func parseTemplates(dir, name string) *template.Template {
@@ -44,7 +56,10 @@ func parseTemplates(dir, name string) *template.Template {
 	return tmpl
 }
 
-func (env *Env) renderResponse(w http.ResponseWriter, templateName string, templateData interface{}) {
+func (env *Env) renderResponse(w http.ResponseWriter, r *http.Request, templateName string, templateData RenderParams) {
+	if flashErr := r.Context().Value(FlashCtx); flashErr != nil {
+		templateData.SetFlash(flashErr.(string))
+	}
 	err := env.template.ExecuteTemplate(w, templateName, templateData)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -67,7 +82,7 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 		[]string{"/login", "/register", "/about", "/"},
 		func(err error, w http.ResponseWriter) {
 			w.WriteHeader(401)
-			err = tmpl.ExecuteTemplate(w, "login", RenderParams{Flash: "You need to sign in before accessing that page"})
+			err = tmpl.ExecuteTemplate(w, "login", BaseParams{Flash: "You need to sign in before accessing that page"})
 			if err != nil {
 				log.Println(err.Error())
 			}
@@ -95,28 +110,28 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 }
 
 func (env *Env) GetHome(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{loggedIn(r), ""})
+	env.renderResponse(w, r, "login", &BaseParams{loggedIn(r), ""})
 }
 
 func (env *Env) GetLogin(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "login", RenderParams{loggedIn(r), ""})
+	env.renderResponse(w, r, "login", &BaseParams{loggedIn(r), ""})
 }
 
 func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, "register", RenderParams{loggedIn(r), ""})
+	env.renderResponse(w, r, "register", &BaseParams{loggedIn(r), ""})
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"Sign in failed, please try again."})
+		env.template.ExecuteTemplate(w, "login", &BaseParams{Flash: "Sign in failed, please try again."})
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
 	user, err := env.auth.AuthenticateUser(email, password)
 	if err != nil {
 		log.Printf("failed auth attempt: %s ", err.Error())
 		w.WriteHeader(401)
-		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"The username or password are not correct."})
+		env.template.ExecuteTemplate(w, "login", &BaseParams{Flash: "The username or password are not correct."})
 		return
 	}
 
@@ -133,7 +148,7 @@ type RegisterPayload struct {
 func (env *Env) PostRegister(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{Flash:"Sign in failed, please try again."})
+		env.template.ExecuteTemplate(w, "login", &BaseParams{Flash: "Sign in failed, please try again."})
 		return
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
@@ -154,7 +169,7 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 		var err error
 		pageNo, err = strconv.Atoi(pageNoStr)
 		if err != nil {
-			env.renderResponse(w, "error", RenderParams{true, "An error has occured"})
+			env.renderResponse(w, r, "error", &BaseParams{true, "An error has occured"})
 			return
 		}
 	}
@@ -174,24 +189,31 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 		pageNumbers[i] = Page{i + 1, i == pageNo}
 	}
 	data := EntriesResp{
-		RenderParams: RenderParams{true, ""},
-		Entries: entries,
-		DayIdx: postCnt,
-		Pages: pageNumbers,
+		BaseParams: BaseParams{true, ""},
+		Entries:    entries,
+		DayIdx:     postCnt,
+		Pages:      pageNumbers,
 	}
-	env.renderResponse(w, "entries", data)
+	env.renderResponse(w, r, "entries", &data)
 }
 
 func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value("user").(*db.User)
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", RenderParams{true,"Could not create post"})
+		env.template.ExecuteTemplate(w, "login", &BaseParams{true,"Could not create post"})
 		return
 	}
-	err = env.store.CreatePost(u.Id, r.PostForm.Get("title"), r.PostForm.Get("body"))
+	title := strings.Trim(r.PostForm.Get("title"), " \n")
+	body := strings.Trim(r.PostForm.Get("body"), " \n")
+	err = env.store.CreatePost(u.Id, title, body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		hrErr := "saving the entry failed"
+		if len(body) == 0 && len(title) == 0{
+			hrErr = "the entry needs either a title or body"
+		}
+		r = r.WithContext(context.WithValue(r.Context(), FlashCtx, hrErr))
+		env.GetEntries(w, r)
 		return
 	}
 	http.Redirect(w, r, "/entries", http.StatusSeeOther)
@@ -256,7 +278,7 @@ type Page struct {
 	Current bool
 }
 type EntriesResp struct {
-	RenderParams
+	BaseParams
 	Entries []Entry
 	DayIdx int
 	Pages []Page
