@@ -1,0 +1,1 @@
+ALTER TABLE posts ADD CONSTRAINT body_or_title_present CHECK (body <> '' or title <> '')
