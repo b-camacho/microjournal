@@ -174,7 +174,7 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 	entries := make([]Entry, 0)
 	for i, post := range posts {
 		entry := toEntry(post)
-		entry.Idx = postCnt - i
+		entry.Idx = postCnt - i - 1
 		entries = append(entries, entry)
 	}
 
