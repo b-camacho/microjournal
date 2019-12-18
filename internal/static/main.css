@@ -109,6 +109,7 @@ div.entry > .body {
     color: var(--main-color-half);
     text-align: left;
     margin-bottom: 0;
+    white-space: pre-line;
 }
 div.entry > .date {
     text-align: right;

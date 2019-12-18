@@ -65,7 +65,8 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 	}
 	hash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
+		return nil, fmt.Errorf("Could not create user")
 	}
 
 	statement := `INSERT INTO users(email, password) VALUES($1, $2)`

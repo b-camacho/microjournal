@@ -91,10 +91,9 @@ func NewRouter(store db.PStore, auth auth.Env) http.Handler {
 
 	r.Use(authMiddleware)
 	r.Get("/", env.GetHome)
-	r.Get("/register", env.GetRegister)
+	//r.Get("/register", env.GetRegister)
 	r.Get("/login", env.GetLogin)
 	r.Get("/entries", env.GetEntries)
-	//r.Get("/register", env.GetRegister)
 	r.Post("/entry", env.PostEntry)
 	r.Post("/register", env.PostRegister)
 	r.Post("/login", env.PostLogin)
@@ -115,10 +114,6 @@ func (env *Env) GetHome(w http.ResponseWriter, r *http.Request) {
 
 func (env *Env) GetLogin(w http.ResponseWriter, r *http.Request) {
 	env.renderResponse(w, r, "login", &BaseParams{loggedIn(r), ""})
-}
-
-func (env *Env) GetRegister(w http.ResponseWriter, r *http.Request) {
-	env.renderResponse(w, r, "register", &BaseParams{loggedIn(r), ""})
 }
 
 func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
@@ -148,13 +143,14 @@ type RegisterPayload struct {
 func (env *Env) PostRegister(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		env.template.ExecuteTemplate(w, "login", &BaseParams{Flash: "Sign in failed, please try again."})
+		env.renderResponse(w, r, "login", &BaseParams{Flash:"Sign up failed"})
 		return
 	}
 	email, password := r.PostForm.Get("email"), r.PostForm.Get("password")
 	user, err := env.store.CreateUser(email, []byte(password))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		env.renderResponse(w, r, "login", &BaseParams{Flash:err.Error()})
+		return
 	}
 	cookie := env.auth.SerialiseUser(user)
 	http.SetCookie(w, cookie)
