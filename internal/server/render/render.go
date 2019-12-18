@@ -172,8 +172,10 @@ func (env *Env) GetEntries(w http.ResponseWriter, r *http.Request) {
 
 	posts, postCnt := env.store.FindPosts(u.Id, pageNo * env.perPage, (pageNo + 1) * env.perPage)
 	entries := make([]Entry, 0)
-	for _, post := range posts {
-		entries = append(entries, toEntry(post))
+	for i, post := range posts {
+		entry := toEntry(post)
+		entry.Idx = postCnt - i
+		entries = append(entries, entry)
 	}
 
 	pageCnt := postCnt / env.perPage
@@ -205,7 +207,7 @@ func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 	err = env.store.CreatePost(u.Id, title, body)
 	if err != nil {
 		hrErr := "saving the entry failed"
-		if len(body) == 0 && len(title) == 0{
+		if len(body) == 0 && len(title) == 0 {
 			hrErr = "the entry needs either a title or body"
 		}
 		r = r.WithContext(context.WithValue(r.Context(), FlashCtx, hrErr))
@@ -268,6 +270,7 @@ type Entry struct {
 	Created_at string
 	Title string
 	Body string
+	Idx int
 }
 type Page struct {
 	Idx int

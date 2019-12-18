@@ -121,6 +121,9 @@ func (db *DB) FindPosts(userId, offset, limit int) ([]*Post, int) {
 func (db *DB) CreatePost(userId int, title, body string) error {
 	_, err := db.conn.
 		Exec(`INSERT INTO posts VALUES (DEFAULT, $1, $2, $3)`, userId, title, body)
+	if err != nil {
+		log.Println(err.Error())
+	}
 	return err
 }
 
