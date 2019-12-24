@@ -29,6 +29,8 @@ func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
 	return user, nil
 }
 
+const MaxAge = 31557600 // 1 year in seconds
+
 func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
 	encoded, err := env.s.Encode(CookieName, user.Id)
 	if err != nil {
@@ -38,6 +40,7 @@ func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
 		Name:  CookieName,
 		Value: encoded,
 		Path:  "/",
+		MaxAge: MaxAge,
 	}
 	err = env.store.CreateSession(user.Id)
 	if err != nil {
