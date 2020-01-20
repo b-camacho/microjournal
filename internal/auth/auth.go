@@ -17,12 +17,14 @@ type Env struct {
 	s     *securecookie.SecureCookie
 }
 
+const SessionMaxAge = 315576000
+
 func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
 	user, err := env.store.FindUser("email", email)
 	if err != nil {
 		return nil, fmt.Errorf("no user with email %s", email)
 	}
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	err = bcrypt.CompareHashAndPassword(user.Password, []byte(password))
 	if err != nil {
 		return nil, fmt.Errorf("incorrect password")
 	}
@@ -38,6 +40,7 @@ func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
 		Name:  CookieName,
 		Value: encoded,
 		Path:  "/",
+		MaxAge: SessionMaxAge,
 	}
 	err = env.store.CreateSession(user.Id)
 	if err != nil {
