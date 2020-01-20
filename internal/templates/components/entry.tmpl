@@ -1,6 +1,6 @@
 {{define "entry"}}
 <div class="entry">
-    <h2>{{.Title}}</h2>
+    <h2>{{if .Title}} {{.Title}} {{else}} Entry #{{.Idx}} {{end}}</h2>
     <p class="body">{{.Body}}</p>
     <p class="date">{{.Created_at}}</p>
 </div>

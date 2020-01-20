@@ -65,7 +65,8 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 	}
 	hash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
 	if err != nil {
-		return nil, err
+		log.Println(err.Error())
+		return nil, fmt.Errorf("Could not create user")
 	}
 
 	statement := `INSERT INTO users(email, password) VALUES($1, $2)`
@@ -120,6 +121,9 @@ func (db *DB) FindPosts(userId, offset, limit int) ([]*Post, int) {
 func (db *DB) CreatePost(userId int, title, body string) error {
 	_, err := db.conn.
 		Exec(`INSERT INTO posts VALUES (DEFAULT, $1, $2, $3)`, userId, title, body)
+	if err != nil {
+		log.Println(err.Error())
+	}
 	return err
 }
 
