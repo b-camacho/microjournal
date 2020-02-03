@@ -217,6 +217,10 @@ func (env *Env) PostEntry(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/entries", http.StatusSeeOther)
 }
 
+func (env *Env) DeleteEntry(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func (env *Env) GetLogout(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value("user").(*db.User)
 	cookie := &http.Cookie{

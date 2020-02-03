@@ -15,11 +15,6 @@ import (
 	"github.com/go-chi/chi/middleware"
 )
 
-// HelloWorld is a sample handler
-func HelloWorld(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello world!")
-}
-
 // NewRouter returns a new HTTP handler that implements the main server routes
 func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.Handler {
 	router := chi.NewRouter()
@@ -44,9 +39,4 @@ func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.
 	router.Mount("/api/v1/", api.NewRouter(store, authProvider))
 
 	return router
-}
-
-func GenericError(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte("Baaaaad request"))
 }

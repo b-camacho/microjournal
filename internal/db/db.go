@@ -13,8 +13,10 @@ import (
 type PStore interface {
 	FindUser(string, interface{}) (*User, error)
 	CreateUser(string, []byte) (*User, error)
+	DeleteUser(int) error
 	FindPosts(int, int, int) ([]*Post, int)
 	CreatePost(int, string, string) error
+	DeletePost(int) error
 	CreateSession(int) error
 	ExistsSession(int) bool
 	InvalidateSession(int) error
@@ -77,6 +79,15 @@ func (db *DB) CreateUser(email string, password []byte) (*User, error) {
 	return db.FindUser("email", email)
 }
 
+func (db *DB) DeleteUser(id int) error {
+	statement := `DELETE FROM users WHERE id = $1 CASCADE`
+	_, err := db.conn.Exec(statement, id)
+	if err != nil {
+		return  err
+	}
+	return nil
+}
+
 func (db *DB) FindPosts(userId, offset, limit int) ([]*Post, int) {
 	query := fmt.Sprintf("SELECT id, title, body, created_at, updated_at, deleted_at FROM POSTS " +
 		"WHERE user_id = $1 AND deleted_at IS NULL " +
@@ -127,6 +138,15 @@ func (db *DB) CreatePost(userId int, title, body string) error {
 	return err
 }
 
+func (db *DB) DeletePost(id int) error {
+	_, err := db.conn.
+		Exec(`DELETE FROM posts where id = $1`, id)
+	if err != nil {
+		log.Println(err.Error())
+	}
+	return err
+}
+
 func (db *DB) CreateSession(userId int) error {
 	_, err := db.conn.
 		Exec("INSERT INTO sessions VALUES " +
@@ -137,7 +157,6 @@ func (db *DB) CreateSession(userId int) error {
 
 func (db *DB) ExistsSession(userId int) bool {
 	var hasSession int
-
 	db.conn.
 		QueryRow("SELECT COUNT(1) FROM sessions WHERE user_id = $1 AND valid = TRUE", userId).Scan(&hasSession)
 	if hasSession == 1 {

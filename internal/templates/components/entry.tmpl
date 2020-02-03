@@ -1,6 +1,7 @@
 {{define "entry"}}
 <div class="entry">
     <h2>{{if .Title}} {{.Title}} {{else}} Entry #{{.Idx}} {{end}}</h2>
+    <form method="post" action="/entry/{{.Id}}/delete"><input type="submit"/></form>
     <p class="body">{{.Body}}</p>
     <p class="date">{{.Created_at}}</p>
 </div>
