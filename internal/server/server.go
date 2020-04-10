@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"github.com/b-camacho/microjournal/internal/auth"
 	"github.com/b-camacho/microjournal/internal/config"
 	"github.com/b-camacho/microjournal/internal/db"
@@ -28,7 +27,6 @@ func NewRouter(conf config.Config, authProvider auth.Env, store db.PStore) http.
 
 	// Set up static file serving
 	staticPath, _ := filepath.Abs("internal/static")
-	fmt.Println(staticPath)
 	fs := http.FileServer(http.Dir(staticPath))
 	router.Handle("/static*", http.StripPrefix("/static/", fs))
 

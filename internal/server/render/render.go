@@ -130,7 +130,7 @@ func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := env.auth.SerialiseUser(user)
+	cookie := env.auth.SerializeUser(user)
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, "/entries", http.StatusSeeOther)
 }
@@ -152,7 +152,7 @@ func (env *Env) PostRegister(w http.ResponseWriter, r *http.Request) {
 		env.renderResponse(w, r, "login", &BaseParams{Flash:err.Error()})
 		return
 	}
-	cookie := env.auth.SerialiseUser(user)
+	cookie := env.auth.SerializeUser(user)
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, "/entries", http.StatusSeeOther)
 }

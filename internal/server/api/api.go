@@ -75,7 +75,7 @@ func (env *Env) PostLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 401)
 		return
 	}
-	cookie := env.auth.SerialiseUser(user)
+	cookie := env.auth.SerializeUser(user)
 
 	http.SetCookie(w, cookie)
 }
@@ -96,7 +96,7 @@ func (env *Env) PostRegister(w http.ResponseWriter,	r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	cookie := env.auth.SerialiseUser(user)
+	cookie := env.auth.SerializeUser(user)
 	http.SetCookie(w, cookie)
 	w.WriteHeader(http.StatusOK)
 }

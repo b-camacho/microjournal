@@ -31,7 +31,7 @@ func (env *Env) AuthenticateUser(email, password string) (*db.User, error) {
 	return user, nil
 }
 
-func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
+func (env *Env) SerializeUser(user *db.User) *http.Cookie {
 	encoded, err := env.s.Encode(CookieName, user.Id)
 	if err != nil {
 		log.Println(err.Error())
@@ -49,7 +49,7 @@ func (env *Env) SerialiseUser(user *db.User) *http.Cookie {
 	return cookie
 }
 
-func (env *Env) DeserialiseUser(cookie *http.Cookie) (*db.User, error) {
+func (env *Env) DeserializeUser(cookie *http.Cookie) (*db.User, error) {
 	var uid int
 	err := env.s.Decode(CookieName, cookie.Value, &uid)
 	if err != nil {
@@ -62,7 +62,9 @@ func (env *Env) DeserialiseUser(cookie *http.Cookie) (*db.User, error) {
 	return env.store.FindUser("id", uid)
 }
 
-func (env *Env) RequireAuthentication(exclusions []string, onerr func(error, http.ResponseWriter)) func(handler http.Handler) http.Handler {
+func (env *Env) RequireAuthentication(
+	exclusions []string,
+	onerr func(error, http.ResponseWriter)) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var excluded bool
@@ -80,7 +82,7 @@ func (env *Env) RequireAuthentication(exclusions []string, onerr func(error, htt
 				onerr(err, w)
 				return
 			}
-			user, err := env.DeserialiseUser(cookie)
+			user, err := env.DeserializeUser(cookie)
 			if err != nil {
 				if excluded {
 					next.ServeHTTP(w, r)
